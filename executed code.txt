@@ -1,0 +1,81 @@
+import csv
+import numpy as np
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
+import matplotlib.pyplot as plt
+
+def normalize_data(data):
+    # normalize data to range of [0, 100]
+    return (data - np.min(data)) / (np.max(data) - np.min(data)) * 100
+
+with open('humidity.csv', 'r') as f:
+    reader = csv.reader(f)
+    next(reader)  # Skip the header row
+    humidity_data = [float(row[1]) for row in reader]
+
+with open('temperature.csv', 'r') as f:
+    reader = csv.reader(f)
+    next(reader)  # Skip the header row
+    temperature_data = [float(row[1]) for row in reader]
+
+with open('soil_moisture.csv', 'r') as f:
+    reader = csv.reader(f)
+    next(reader)  # Skip the header row
+    soil_moisture_data = [float(row[1]) for row in reader]
+
+# Normalize data to range of [0, 100]
+humidity = normalize_data(np.array(humidity_data))
+temperature = normalize_data(np.array(temperature_data))
+soil_moisture = normalize_data(np.array(soil_moisture_data))
+
+# Define input and output variables with triangular membership functions
+humidity_level = ctrl.Antecedent(np.arange(0, 101, 1), 'humidity')
+humidity_level['low'] = fuzz.trimf(humidity_level.universe, [0, 0, 50])
+humidity_level['optimum'] = fuzz.trimf(humidity_level.universe, [0, 50, 100])
+humidity_level['high'] = fuzz.trimf(humidity_level.universe, [50, 100, 100])
+
+temperature_level = ctrl.Antecedent(np.arange(0, 101, 1), 'temperature')
+temperature_level['low'] = fuzz.trimf(temperature_level.universe, [0, 0, 50])
+temperature_level['optimum'] = fuzz.trimf(temperature_level.universe, [0, 50, 100])
+temperature_level['high'] = fuzz.trimf(temperature_level.universe, [50, 100, 100])
+
+soil_moisture_level = ctrl.Antecedent(np.arange(-1, 101, 1), 'soil_moisture')
+soil_moisture_level['low'] = fuzz.trimf(soil_moisture_level.universe, [0, 0, 50])
+soil_moisture_level['optimum'] = fuzz.trimf(soil_moisture_level.universe, [0, 50, 100])
+soil_moisture_level['high'] = fuzz.trimf(soil_moisture_level.universe, [50, 100, 100])
+
+plant_growth = ctrl.Consequent(np.arange(0, 101, 1), 'plant_growth')
+plant_growth['bad'] = fuzz.trimf(plant_growth.universe, [0, 0, 50])
+plant_growth['good'] = fuzz.trimf(plant_growth.universe, [0, 50, 100])
+plant_growth['better'] = fuzz.trimf(plant_growth.universe, [50, 100, 100])
+
+# Define rules to determine plant growth based on input variables
+rule1 = ctrl.Rule(humidity_level['low'] | temperature_level['low'] | soil_moisture_level['low'], plant_growth['bad'])
+rule2 = ctrl.Rule(humidity_level['optimum'] & temperature_level['optimum'] & soil_moisture_level['optimum'], plant_growth['good'])
+rule3 = ctrl.Rule(humidity_level['high'] & temperature_level['high'] & soil_moisture_level['high'], plant_growth['better'])
+
+# Create control system and simulation
+plant_growth_ctrl = ctrl.ControlSystem([rule1, rule2, rule3])
+simulation = ctrl.ControlSystemSimulation(plant_growth_ctrl)
+
+#Set input values for simulation
+simulation.input['humidity'] = humidity
+simulation.input['temperature'] = temperature
+simulation.input['soil_moisture'] = soil_moisture
+
+
+
+# Run simulation
+simulation.compute()
+
+# Print output of simulation
+#print(simulation.output['plant_growth'])
+
+
+
+# Visualize fuzzy sets and output of simulation
+humidity_level.view()
+temperature_level.view()
+soil_moisture_level.view()
+plant_growth.view()
+plt.show()
